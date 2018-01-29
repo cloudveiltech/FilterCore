@@ -159,7 +159,7 @@ namespace CitadelCore.Net.Handlers
                 byte[] requestBlockResponse = null;
                 m_msgBeginCb?.Invoke(reqUrl, reqHeaderBuilder.ToString(), m_nullBody, context.Request.IsHttps ? MessageType.Https : MessageType.Http, MessageDirection.Request, out requestNextAction, out requestBlockResponseContentType, out requestBlockResponse);
 
-                if(requestNextAction == ProxyNextAction.DropConnection)
+                if (requestNextAction == ProxyNextAction.DropConnection)
                 {
                     if(requestBlockResponse != null)
                     {

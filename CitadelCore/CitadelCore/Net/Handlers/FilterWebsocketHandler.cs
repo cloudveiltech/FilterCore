@@ -198,7 +198,16 @@ namespace CitadelCore.Net.Handlers
             }
             catch(Exception wshe)
             {
-                LoggerProxy.Default.Error(wshe);
+                Exception ex = wshe;
+
+                while(ex != null)
+                {
+                    LoggerProxy.Default.Error(string.Format("Websocket error occurred while handling. {0}", ex.GetType().Name));
+                    LoggerProxy.Default.Error(ex);
+
+                    ex = ex.InnerException;
+                }
+                
             }
         }
     }
