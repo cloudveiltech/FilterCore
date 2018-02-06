@@ -15,6 +15,7 @@ using System.Text;
 using System.Threading;
 using CitadelCore.Net.Http;
 using CitadelCore.Extensions;
+using System.Diagnostics;
 
 namespace CitadelCore.Net.Handlers
 {
@@ -33,6 +34,8 @@ namespace CitadelCore.Net.Handlers
 
         public override async Task Handle(HttpContext context)
         {
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            
             try
             {
                 // First we need the URL for this connection, since it's been requested to be upgraded to
@@ -157,6 +160,10 @@ namespace CitadelCore.Net.Handlers
                             return;
                         }
                 }
+
+                stopwatch.Stop();
+
+                LoggerProxy.Default.Info($"Websocket negotiation took {stopwatch.ElapsedMilliseconds} ms");
 
                 // Spawn an async task that will poll the remote server for data in a loop, and then
                 // write any data it gets to the client websocket.

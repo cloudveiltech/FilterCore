@@ -11,6 +11,7 @@ using CitadelCore.Net.Proxy;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -71,12 +72,15 @@ namespace CitadelCore.Net.Handlers
         }
 
         public override async Task Handle(HttpContext context)
-        {
+        {            
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
             try
             {
                 // Use helper to get the full, proper URL for the request.
                 //var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
                 var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetEncodedUrl(context.Request);
+                LoggerProxy.Default.Info($"Request {fullUrl}");
 
                 // Next we need to try and parse the URL as a URI, because the websocket client
                 // requires this for connecting upstream.
@@ -256,7 +260,6 @@ namespace CitadelCore.Net.Handlers
                 // can just async stream the content transparently and Kestrel is so cool and sweet
                 // and nice, it'll automatically stream as chunked content.
                 HttpResponseMessage response = null;
-
                 try
                 {
                     response = await s_client.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
@@ -379,8 +382,11 @@ namespace CitadelCore.Net.Handlers
 
                     if(responseNextAction == ProxyNextAction.AllowButRequestContentInspection)
                     {
+                        Stopwatch stopwatch2 = Stopwatch.StartNew();
+
                         using(var upstreamResponseStream = await response.Content.ReadAsStreamAsync())
                         {
+
                             using(var ms = new MemoryStream())
                             {
                                 await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(upstreamResponseStream, ms, null, context.RequestAborted);
@@ -391,6 +397,7 @@ namespace CitadelCore.Net.Handlers
                                 responseBlockResponseContentType = string.Empty;
                                 responseBlockResponse = null;
                                 m_msgEndCb?.Invoke(reqUrl, resHeaderBuilder.ToString(), responseBody, context.Request.IsHttps ? MessageType.Https : MessageType.Http, MessageDirection.Response, out shouldBlockResponse, out responseBlockResponseContentType, out responseBlockResponse);
+                                LoggerProxy.Default.Info($"elapsed time {fullUrl} after m_msgEndCb: {stopwatch2.ElapsedMilliseconds}");
 
                                 if(shouldBlockResponse)
                                 {
@@ -436,6 +443,10 @@ namespace CitadelCore.Net.Handlers
 
                                 // Ensure we exit here, because if we fall past this scope then the
                                 // response is going to get mangled.
+                                stopwatch.Stop();
+
+                                //LoggerProxy.Default.Info($"Request:444 {Microsoft.AspNetCore.Http.Extensions.UriHelper.GetEncodedUrl(context.Request)} took {stopwatch.ElapsedMilliseconds} ms");
+
                                 return;
                             }
                         }
@@ -481,6 +492,10 @@ namespace CitadelCore.Net.Handlers
                     LoggerProxy.Default.Error(e);
                 }
             }
+
+            stopwatch.Stop();
+
+            //LoggerProxy.Default.Info($"Request {Microsoft.AspNetCore.Http.Extensions.UriHelper.GetEncodedUrl(context.Request)} took {stopwatch.ElapsedMilliseconds} ms");
         }
 
         /// <summary>
