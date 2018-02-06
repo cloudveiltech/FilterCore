@@ -17,7 +17,6 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
-using CitadelCore.Net.WebSockets;
 
 namespace CitadelCore.Net.Proxy
 {
@@ -338,8 +337,6 @@ namespace CitadelCore.Net.Proxy
             {
                 // We proxy websockets, so enable this.
                 app.UseWebSockets();
-
-                app.UseCitadelWebSocketMiddleware();
 
                 // Exception handler. Not yet sure what to do here.
                 app.UseExceptionHandler(

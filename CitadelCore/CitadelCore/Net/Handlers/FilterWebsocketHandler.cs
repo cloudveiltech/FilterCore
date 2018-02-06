@@ -15,7 +15,7 @@ using System.Text;
 using System.Threading;
 using CitadelCore.Net.Http;
 using CitadelCore.Extensions;
-using CitadelCore.Net.WebSockets;
+using Microsoft.AspNetCore.WebSockets.Protocol;
 
 namespace CitadelCore.Net.Handlers
 {
@@ -59,15 +59,77 @@ namespace CitadelCore.Net.Handlers
                     LoggerProxy.Default.Error("Failed to parse websocket URI.");
                     return;
                 }
-                
+
+                string subProtocol = context.Request.Headers[Constants.Headers.SecWebSocketProtocol];
+                var wsServer = new ClientWebSocket();
+
+                if(subProtocol != null && subProtocol.Length > 0)
+                {
+                    wsServer.Options.AddSubProtocol(subProtocol);
+                }
+
+                wsServer.Options.Cookies = new System.Net.CookieContainer();
+
+                foreach (var cookie in context.Request.Cookies)
+                {
+                    try
+                    {
+                        wsServer.Options.Cookies.Add(new Uri(fullUrl, UriKind.Absolute), new System.Net.Cookie(cookie.Key, System.Net.WebUtility.UrlEncode(cookie.Value)));
+                    }
+                    catch (Exception e)
+                    {
+                        LoggerProxy.Default.Error("Error while attempting to add websocket cookie.");
+                        LoggerProxy.Default.Error(e);
+                    }
+                }
+
+                if (context.Connection.ClientCertificate != null)
+                {
+                    wsServer.Options.ClientCertificates = new System.Security.Cryptography.X509Certificates.X509CertificateCollection(new[] { context.Connection.ClientCertificate.ToV2Certificate() });
+                }
+
+
+                LoggerProxy.Default.Info(string.Format("Connecting websocket to {0}", wsUri.AbsoluteUri));
+
+                var reqHeaderBuilder = new StringBuilder();
+                foreach (var hdr in context.Request.Headers)
+                {
+                    if (!ForbiddenHttpHeaders.IsForbidden(hdr.Key))
+                    {
+                        reqHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, hdr.Value.ToString());
+
+                        try
+                        {
+                            if (!ForbiddenWsHeaders.IsForbidden(hdr.Key))
+                            {
+                                wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());
+                                Console.WriteLine("Set Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
+                            }
+                        }
+                        catch (Exception hdrException)
+                        {
+                            Console.WriteLine("Failed Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
+                            LoggerProxy.Default.Error(hdrException);
+                        }
+                    }
+                }
+
+                reqHeaderBuilder.Append("\r\n");
+
+                string serverSubProtocol = null;
+
+                await wsServer.ConnectAsync(wsUri, context.RequestAborted);
+                if (wsServer.State == System.Net.WebSockets.WebSocketState.Open)
+                {
+                    serverSubProtocol = wsServer.SubProtocol;
+                }
+                else
+                {
+
+                }
+
                 // Create, via acceptor, the client websocket. This is the local machine's websocket.
-                var wsClient = await context.WebSockets.AcceptWebSocketAsync(); // The bug is here.
-
-                WebSocketInfo info = CitadelWebSocketManager.Default.GetNegotiatedSocket(wsClient);
-
-                // Unfortunately, due to the messy nature of this architecture, we can't 
-                // Create the websocket that's going to connect to the remote server.
-                ClientWebSocket wsServer = info.ClientSocket;
+                var wsClient = await context.WebSockets.AcceptWebSocketAsync(serverSubProtocol);
                 
                 /*
                 TODO - Much of this is presently lost to us because the socket
@@ -85,17 +147,12 @@ namespace CitadelCore.Net.Handlers
                 wsServer.Options.UseDefaultCredentials = wsClient.Options.UseDefaultCredentials;
                 */
 
-                if (context.Connection.ClientCertificate != null)
-                {
-                    wsServer.Options.ClientCertificates = new System.Security.Cryptography.X509Certificates.X509CertificateCollection(new[] { context.Connection.ClientCertificate.ToV2Certificate() });
-                }
-
                 LoggerProxy.Default.Info(string.Format("Connecting websocket to {0}", wsUri.AbsoluteUri));
 
                 ProxyNextAction nxtAction = ProxyNextAction.AllowAndIgnoreContentAndResponse;
                 string customResponseContentType = string.Empty;
                 byte[] customResponse = null;
-                m_msgBeginCb?.Invoke(wsUri, info.RequestHeaders, null, context.Request.IsHttps ? MessageType.SecureWebSocket : MessageType.WebSocket, MessageDirection.Request, out nxtAction, out customResponseContentType, out customResponse);
+                m_msgBeginCb?.Invoke(wsUri, reqHeaderBuilder.ToString(), null, context.Request.IsHttps ? MessageType.SecureWebSocket : MessageType.WebSocket, MessageDirection.Request, out nxtAction, out customResponseContentType, out customResponse);
 
                 switch(nxtAction)
                 {
