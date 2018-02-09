@@ -15,6 +15,7 @@ using System.Text;
 using System.Threading;
 using CitadelCore.Net.Http;
 using CitadelCore.Extensions;
+using Microsoft.AspNetCore.WebSockets.Protocol;
 
 namespace CitadelCore.Net.Handlers
 {
@@ -28,7 +29,7 @@ namespace CitadelCore.Net.Handlers
     {
         public FilterWebsocketHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback) : base(messageBeginCallback, messageEndCallback)
         {
-
+            Console.WriteLine("New FilterWebsocketHandler");
         }
 
         public override async Task Handle(HttpContext context)
@@ -40,11 +41,11 @@ namespace CitadelCore.Net.Handlers
                 var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
 
                 // Need to replate the scheme with appropriate websocket scheme.
-                if(fullUrl.StartsWith("http://"))
+                if (fullUrl.StartsWith("http://"))
                 {
                     fullUrl = "ws://" + fullUrl.Substring(7);
                 }
-                else if(fullUrl.StartsWith("https://"))
+                else if (fullUrl.StartsWith("https://"))
                 {
                     fullUrl = "wss://" + fullUrl.Substring(8);
                 }
@@ -53,38 +54,82 @@ namespace CitadelCore.Net.Handlers
                 // this for connecting upstream.
                 Uri wsUri = null;
 
-                if(!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out wsUri))
+                if (!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out wsUri))
                 {
                     LoggerProxy.Default.Error("Failed to parse websocket URI.");
                     return;
                 }
-                
-                // Create, via acceptor, the client websocket. This is the local machine's websocket.
-                var wsClient = await context.WebSockets.AcceptWebSocketAsync();
 
-                // Create the websocket that's going to connect to the remote server.
-                ClientWebSocket wsServer = new ClientWebSocket();
+                string subProtocol = context.Request.Headers[Constants.Headers.SecWebSocketProtocol];
+                var wsServer = new ClientWebSocket();
 
-                if(wsClient.SubProtocol != null && wsClient.SubProtocol.Length > 0)
+                if(subProtocol != null && subProtocol.Length > 0)
                 {
-                    
-                    wsServer.Options.AddSubProtocol(wsClient.SubProtocol);
+                    wsServer.Options.AddSubProtocol(subProtocol);
                 }
 
-                wsServer.Options.Cookies = new System.Net.CookieContainer();                
+                wsServer.Options.Cookies = new System.Net.CookieContainer();
 
-                foreach(var cookie in context.Request.Cookies)
+                foreach (var cookie in context.Request.Cookies)
                 {
                     try
                     {
-                        wsServer.Options.Cookies.Add(new Uri(fullUrl, UriKind.Absolute), new System.Net.Cookie(cookie.Key, System.Net.WebUtility.UrlEncode(cookie.Value)));                        
+                        wsServer.Options.Cookies.Add(new Uri(fullUrl, UriKind.Absolute), new System.Net.Cookie(cookie.Key, System.Net.WebUtility.UrlEncode(cookie.Value)));
                     }
-                    catch(Exception e)
+                    catch (Exception e)
                     {
                         LoggerProxy.Default.Error("Error while attempting to add websocket cookie.");
-                        LoggerProxy.Default.Error(e);                        
+                        LoggerProxy.Default.Error(e);
                     }
                 }
+
+                if (context.Connection.ClientCertificate != null)
+                {
+                    wsServer.Options.ClientCertificates = new System.Security.Cryptography.X509Certificates.X509CertificateCollection(new[] { context.Connection.ClientCertificate.ToV2Certificate() });
+                }
+
+
+                LoggerProxy.Default.Info(string.Format("Connecting websocket to {0}", wsUri.AbsoluteUri));
+
+                var reqHeaderBuilder = new StringBuilder();
+                foreach (var hdr in context.Request.Headers)
+                {
+                    if (!ForbiddenHttpHeaders.IsForbidden(hdr.Key))
+                    {
+                        reqHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, hdr.Value.ToString());
+
+                        try
+                        {
+                            if (!ForbiddenWsHeaders.IsForbidden(hdr.Key))
+                            {
+                                wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());
+                                Console.WriteLine("Set Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
+                            }
+                        }
+                        catch (Exception hdrException)
+                        {
+                            Console.WriteLine("Failed Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
+                            LoggerProxy.Default.Error(hdrException);
+                        }
+                    }
+                }
+
+                reqHeaderBuilder.Append("\r\n");
+
+                string serverSubProtocol = null;
+
+                await wsServer.ConnectAsync(wsUri, context.RequestAborted);
+                if (wsServer.State == System.Net.WebSockets.WebSocketState.Open)
+                {
+                    serverSubProtocol = wsServer.SubProtocol;
+                }
+                else
+                {
+
+                }
+
+                // Create, via acceptor, the client websocket. This is the local machine's websocket.
+                var wsClient = await context.WebSockets.AcceptWebSocketAsync(serverSubProtocol);
                 
                 /*
                 TODO - Much of this is presently lost to us because the socket
@@ -102,42 +147,7 @@ namespace CitadelCore.Net.Handlers
                 wsServer.Options.UseDefaultCredentials = wsClient.Options.UseDefaultCredentials;
                 */
 
-                if(context.Connection.ClientCertificate != null)
-                {
-                    wsServer.Options.ClientCertificates = new System.Security.Cryptography.X509Certificates.X509CertificateCollection(new[] { context.Connection.ClientCertificate.ToV2Certificate() });
-                }
-
                 LoggerProxy.Default.Info(string.Format("Connecting websocket to {0}", wsUri.AbsoluteUri));
-
-                var reqHeaderBuilder = new StringBuilder();
-                foreach(var hdr in context.Request.Headers)
-                {
-                    if(!ForbiddenHttpHeaders.IsForbidden(hdr.Key))
-                    {
-                        reqHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, hdr.Value.ToString());
-
-                        try
-                        {
-                            if(!ForbiddenWsHeaders.IsForbidden(hdr.Key))
-                            {
-                                wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());
-                                Console.WriteLine("Set Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
-                            }
-                        }
-                        catch(Exception hdrException)
-                        {
-                            Console.WriteLine("Failed Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
-                            LoggerProxy.Default.Error(hdrException);
-                        }
-                    }
-                }
-
-                reqHeaderBuilder.Append("\r\n");
-
-                // Connect the server websocket to the upstream, remote webserver.
-                await wsServer.ConnectAsync(wsUri, context.RequestAborted);
-                
-                LoggerProxy.Default.Info(String.Format("Connected websocket to {0}", wsUri.AbsoluteUri));
 
                 ProxyNextAction nxtAction = ProxyNextAction.AllowAndIgnoreContentAndResponse;
                 string customResponseContentType = string.Empty;

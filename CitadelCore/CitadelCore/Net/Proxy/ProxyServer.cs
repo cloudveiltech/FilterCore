@@ -293,6 +293,7 @@ namespace CitadelCore.Net.Proxy
                     listenOpts.NoDelay = true;
                     httpListenOptions = listenOpts;
                 });
+
             });
             
             // Configures how we handle requests and errors, etc.            
@@ -336,7 +337,7 @@ namespace CitadelCore.Net.Proxy
             {
                 // We proxy websockets, so enable this.
                 app.UseWebSockets();
-                
+
                 // Exception handler. Not yet sure what to do here.
                 app.UseExceptionHandler(
                     options =>
@@ -364,7 +365,7 @@ namespace CitadelCore.Net.Proxy
                 // the appropriate handler given what the context us, and then let it return a task
                 // we give back to kestrel to see through.
                 app.Run(context =>
-                {   
+                {
                     return Task.Run(async () =>
                     {
                         var handler = FilterResponseHandlerFactory.Default.GetHandler(context);
