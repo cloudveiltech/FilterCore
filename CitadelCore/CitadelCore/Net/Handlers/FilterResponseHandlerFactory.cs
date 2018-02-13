@@ -34,6 +34,12 @@ namespace CitadelCore.Net.Handlers
             set;
         }
 
+        public BadCertificateCallback BadCertificateCallback
+        {
+            get;
+            set;
+        }
+
         public AbstractFilterResponseHandler GetHandler(HttpContext context)
         {
             if(context.WebSockets.IsWebSocketRequest)
@@ -51,7 +57,7 @@ namespace CitadelCore.Net.Handlers
 
         private AbstractFilterResponseHandler HandleHttp(HttpContext context)
         {
-            return new FilterHttpResponseHandler(MessageBeginCallback, MessageEndCallback);
+            return new FilterHttpResponseHandler(MessageBeginCallback, MessageEndCallback, BadCertificateCallback);
         }
 
         private AbstractFilterResponseHandler HandleUnknownProtocol(HttpContext context)

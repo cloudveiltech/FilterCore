@@ -6,6 +6,7 @@
 */
 
 using System;
+using System.Net.Http;
 
 namespace CitadelCore.Net.Proxy
 {
@@ -140,4 +141,18 @@ namespace CitadelCore.Net.Proxy
     /// the connection.
     /// </param>
     public delegate void MessageEndCallback(Uri requestUrl, string headers, byte[] body, MessageType msgType, MessageDirection msgDirection, out bool shouldBlock, out string customBlockResponseContentType, out byte[] customBlockResponse);
+
+    /// <summary>
+    /// This gets called when a bad SSL certificate is returned by the upstream server.
+    /// </summary>
+    /// <param name="requestUrl">The URL which was being called at the time the certificate error occurred.</param>
+    /// <param name="exception">The related HttpRequestException</param>
+    /// <param name="customResponseContentType">
+    /// If you are providing a custom response body, you need to set the content type here as well.
+    /// </param>
+    /// <param name="customResponse">
+    /// You can set this parameter to whatever you want to for custom responses. If this is null, a 204
+    /// will be gracefully generated to close the connection.
+    /// </param>
+    public delegate void BadCertificateCallback(Uri requestUrl, HttpRequestException exception, out string customResponseContentType, out byte[] customResponse);
 }

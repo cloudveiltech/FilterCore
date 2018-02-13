@@ -65,8 +65,12 @@ namespace CitadelCore.Net.Handlers
 
             s_client = new HttpClient(handler);
         }
-
+        
         public FilterHttpResponseHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback) : base(messageBeginCallback, messageEndCallback)
+        {
+        }
+
+        public FilterHttpResponseHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback, BadCertificateCallback badCertificateCallback) : base(messageBeginCallback, messageEndCallback, badCertificateCallback)
         {
         }
 
@@ -260,6 +264,31 @@ namespace CitadelCore.Net.Handlers
                 try
                 {
                     response = await s_client.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+                }
+                catch(HttpRequestException ex)
+                {
+                    LoggerProxy.Default.Error(ex);
+
+                    if(ex.InnerException is WebException && ex.InnerException.InnerException is System.Security.Authentication.AuthenticationException)
+                    {
+                        if(m_onBadCertificate != null)
+                        {
+                            string customResponseContentType = null;
+                            byte[] customResponse = null;
+                            
+                            m_onBadCertificate(reqUrl, ex, out customResponseContentType, out customResponse);
+
+                            if(customResponse != null)
+                            {
+                                await DoCustomResponse(context, customResponseContentType, customResponse);
+                                return;
+                            }
+                            else
+                            {
+                                Do204(context);
+                            }
+                        }
+                    }
                 }
                 catch(Exception e)
                 {

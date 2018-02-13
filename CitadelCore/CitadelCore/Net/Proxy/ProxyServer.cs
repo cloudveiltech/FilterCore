@@ -133,10 +133,13 @@ namespace CitadelCore.Net.Proxy
         /// <param name="messageEndCallback">
         /// Message end callback enables users to inspect and filter messages once they have completed. 
         /// </param>
+        /// <param name="badCertificateCallback">
+        /// Bad certificate callback 
+        /// </param>
         /// <exception cref="ArgumentException">
         /// Will throw if any one of the callbacks are not defined. 
         /// </exception>
-        public ProxyServer(FirewallCheckCallback firewallCallback, MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback)
+        public ProxyServer(FirewallCheckCallback firewallCallback, MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback, BadCertificateCallback badCertificateCallback = null)
         {
             if(firewallCallback == null)
             {
@@ -155,7 +158,8 @@ namespace CitadelCore.Net.Proxy
             
             m_fwCallback = firewallCallback;
             FilterResponseHandlerFactory.Default.MessageBeginCallback = messageBeginCallback;
-            FilterResponseHandlerFactory.Default.MessageEndCallback = messageEndCallback;            
+            FilterResponseHandlerFactory.Default.MessageEndCallback = messageEndCallback;
+            FilterResponseHandlerFactory.Default.BadCertificateCallback = badCertificateCallback;
         }
 
         /// <summary>

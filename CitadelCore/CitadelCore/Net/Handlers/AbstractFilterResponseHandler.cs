@@ -20,12 +20,22 @@ namespace CitadelCore.Net.Handlers
 
         protected MessageEndCallback m_msgEndCb;
 
+        protected BadCertificateCallback m_onBadCertificate;
+
         protected static readonly byte[] m_nullBody = new byte[0];
 
         public AbstractFilterResponseHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback)
         {
             m_msgBeginCb = messageBeginCallback;
             m_msgEndCb = messageEndCallback;
+            m_onBadCertificate = null;
+        }
+
+        public AbstractFilterResponseHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback, BadCertificateCallback onBadCertificate)
+        {
+            m_msgBeginCb = messageBeginCallback;
+            m_msgEndCb = messageEndCallback;
+            m_onBadCertificate = onBadCertificate;
         }
 
         public abstract Task Handle(HttpContext context);
