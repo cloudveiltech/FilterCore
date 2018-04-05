@@ -20,7 +20,7 @@ namespace CitadelCore.Net.Http
             "X-SDHC",
             "Avail-Dictionary",
             "Content-Length",
-            "Content-Encoding",
+            //"Content-Encoding",
             "Alternate-Protocol",
             "Alt-Svc",
             "Public-Key-Pins",
