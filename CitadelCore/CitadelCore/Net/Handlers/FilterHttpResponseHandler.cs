@@ -15,6 +15,8 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -49,6 +51,7 @@ namespace CitadelCore.Net.Handlers
             ServicePointManager.CheckCertificateRevocationList = true;
             ServicePointManager.ReusePort = true;
             ServicePointManager.UseNagleAlgorithm = false;
+            //ServicePointManager.ServerCertificateValidationCallback = ValidateCertificate;
 
             // We need UseCookies set to false here. We then need to set per-request cookies by
             // manually adding the "Cookie" header. If we don't have UseCookies set to false here,
@@ -60,9 +63,11 @@ namespace CitadelCore.Net.Handlers
                 //PreAuthenticate = false,
                 //UseDefaultCredentials = false,
                 AllowAutoRedirect = false,
-                Proxy = null
-            };
+                Proxy = null,
 
+                
+            };
+            
             s_client = new HttpClient(handler);
         }
         
@@ -72,6 +77,12 @@ namespace CitadelCore.Net.Handlers
 
         public FilterHttpResponseHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback, BadCertificateCallback badCertificateCallback) : base(messageBeginCallback, messageEndCallback, badCertificateCallback)
         {
+        }
+
+        public static bool ValidateCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
+        {
+            LoggerProxy.Default.Info($"Certificate {certificate.GetEffectiveDateString()} {certificate.GetExpirationDateString()} {certificate.Issuer}");
+            return true;
         }
 
         public override async Task Handle(HttpContext context)
@@ -105,16 +116,28 @@ namespace CitadelCore.Net.Handlers
 
                 var failedInitialHeaders = new List<Tuple<string, string>>();
 
+                bool requestHasContentLengthHeader = false;
                 bool requestHasZeroContentLength = false;
+                string contentTypeValue = null;
 
                 // Clone headers from the real client request to our upstream HTTP request.
                 foreach(var hdr in context.Request.Headers)
                 {
                     try
                     {
-                        if(hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && hdr.Value.ToString().Equals("0"))
+                        if(hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
                         {
-                            requestHasZeroContentLength = true;
+                            requestHasZeroContentLength = hdr.Value.ToString().Equals("0");
+                            requestHasContentLengthHeader = true;
+                        }
+                    }
+                    catch { }
+
+                    try
+                    {
+                        if(hdr.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                        {
+                            contentTypeValue = hdr.Value.ToString();
                         }
                     }
                     catch { }
@@ -236,6 +259,19 @@ namespace CitadelCore.Net.Handlers
                             requestMsg.Content.Headers.TryAddWithoutValidation("Content-Length", "0");
                         }
                     }
+                }
+
+                if(contentTypeValue != null && requestMsg.Content == null)
+                {
+                    // FIXME: Parse out charset properly.
+                    string[] contentTypeParts = contentTypeValue.Split(';');
+                    for(int i = 1; i < contentTypeParts.Length; i++)
+                    {
+                        contentTypeParts[i] = contentTypeParts[i].Trim();
+
+                    }
+
+                    requestMsg.Content = new StringContent("", Encoding.UTF8, contentTypeParts[0]);
                 }
 
                 // Ensure that content type is set properly because ByteArrayContent and friends will
