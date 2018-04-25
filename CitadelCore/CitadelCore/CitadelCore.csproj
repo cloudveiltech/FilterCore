@@ -12,11 +12,11 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/cloudveiltech/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Removes 'Content-Encoding' from list of forbidden HTTP headers to fix rosetta stone problem.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds kludge fix for revocation server issues on Filter-Windows.</PackageReleaseNotes>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy. Forked from https://github.com/TechnikEmpire/CitadelCore</Description>
-    <Version>1.3.19</Version>
-    <AssemblyVersion>1.3.19.0</AssemblyVersion>
-    <FileVersion>1.3.17.0</FileVersion>
+    <Version>1.3.20</Version>
+    <AssemblyVersion>1.3.20.0</AssemblyVersion>
+    <FileVersion>1.3.20.0</FileVersion>
     <Product>CitadelCore</Product>
     <PackageId>CloudVeil.CitadelCore</PackageId>    
   </PropertyGroup>

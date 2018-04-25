@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright © 2017 Jesse Nicholson
+* Copyright © 2017 Jesse Nicholson, CloudVeil Technology, Inc.
 * This Source Code Form is subject to the terms of the Mozilla Public
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -51,6 +51,14 @@ namespace CitadelCore.Net.Handlers
             ServicePointManager.CheckCertificateRevocationList = true;
             ServicePointManager.ReusePort = true;
             ServicePointManager.UseNagleAlgorithm = false;
+
+            // This is a kludge for the billing.vispnet.ca issue.
+            // Ideally, we need a little lower-level handle on this issue.
+            // I'd like to be able to check the revocation list, and accept
+            // the cert if the revocation server is offline.
+            // Rather than disabling the check as seen here.
+            ServicePointManager.CheckCertificateRevocationList = false;
+            
             //ServicePointManager.ServerCertificateValidationCallback = ValidateCertificate;
 
             // We need UseCookies set to false here. We then need to set per-request cookies by
@@ -63,9 +71,7 @@ namespace CitadelCore.Net.Handlers
                 //PreAuthenticate = false,
                 //UseDefaultCredentials = false,
                 AllowAutoRedirect = false,
-                Proxy = null,
-
-                
+                Proxy = null
             };
             
             s_client = new HttpClient(handler);
