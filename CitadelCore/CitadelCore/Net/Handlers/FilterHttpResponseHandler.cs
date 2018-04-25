@@ -159,7 +159,11 @@ namespace CitadelCore.Net.Handlers
                         continue;
                     }
 
-                    if(!requestMsg.Headers.TryAddWithoutValidation(hdr.Key, hdr.Value.ToString()))
+                    // Content-Type is typically a header that's attached to a content body.. We have to add this manual check in here because
+                    // we do some nasty reflection farther down which removes Content-Type from the global invalid headers list.
+                    // In other words, we can't guarantee that Content-Type is going to be found as an invalid header according to .NET
+                    // because we manipulate its internal invalid header list.
+                    if(hdr.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase) || !requestMsg.Headers.TryAddWithoutValidation(hdr.Key, hdr.Value.ToString()))
                     {
                         string hName = hdr.Key != null ? hdr.Key : string.Empty;
                         string hValue = hdr.Value.ToString() != null ? hdr.Value.ToString() : string.Empty;
@@ -277,12 +281,37 @@ namespace CitadelCore.Net.Handlers
 
                     }
 
-                    requestMsg.Content = new StringContent("", Encoding.UTF8, contentTypeParts[0]);
+                    // This bit of reflection here is ugly-ugly-ugly. It fixes a bug where clients use and
+                    // depend on the Content-Type header to determine the return message from the server.
+                    // Some alternate fixes.
+                    // 1. Use .NET core (see farther down).
+                    // 2. Re-implement in its entirety the HttpRequestMessage class, which is a bit overkill
+                    
+                    // Note to the reader: NEVER EVER DO THIS IF THERE ARE OTHER OPTIONS.
+                    var field = typeof(System.Net.Http.Headers.HttpRequestHeaders)
+                    .GetField("invalidHeaders", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+                  ?? typeof(System.Net.Http.Headers.HttpRequestHeaders)
+                    .GetField("s_invalidHeaders", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+                    if (field != null)
+                    {
+                        var invalidFields = (HashSet<string>)field.GetValue(null);
+
+                        if (invalidFields.Contains("Content-Type"))
+                        {
+                            invalidFields.Remove("Content-Type");
+                        }
+                    }
+
+                    requestMsg.Headers.TryAddWithoutValidation("Content-Type", contentTypeValue);
+
+                    // This is an alternate fix, which works in .NET core 1.1 according to https://stackoverflow.com/a/44495081
+                    //requestMsg.Content = new StringContent("", Encoding.UTF8, contentTypeParts[0]);
                 }
 
                 // Ensure that content type is set properly because ByteArrayContent and friends will
                 // modify these fields.
-                foreach(var et in failedInitialHeaders)
+                foreach (var et in failedInitialHeaders)
                 {
                     if(!requestMsg.Headers.TryAddWithoutValidation(et.Item1, et.Item2))
                     {
