@@ -300,10 +300,20 @@ namespace CitadelCore.Net.Handlers
                         if (invalidFields.Contains("Content-Type"))
                         {
                             invalidFields.Remove("Content-Type");
+                            LoggerProxy.Default.Info("Removing Content-Type from list of invalid headers.");
                         }
+                    } else
+                    {
+                        LoggerProxy.Default.Info("invalidHeaders fields not found.");
                     }
 
-                    requestMsg.Headers.TryAddWithoutValidation("Content-Type", contentTypeValue);
+                    try
+                    {
+                        requestMsg.Headers.Add("Content-Type", contentTypeValue);
+                    } catch(Exception ex)
+                    {
+                        LoggerProxy.Default.Error(ex);
+                    }
 
                     // This is an alternate fix, which works in .NET core 1.1 according to https://stackoverflow.com/a/44495081
                     //requestMsg.Content = new StringContent("", Encoding.UTF8, contentTypeParts[0]);
