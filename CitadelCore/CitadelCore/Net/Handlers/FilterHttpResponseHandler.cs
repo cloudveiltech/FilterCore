@@ -282,7 +282,8 @@ namespace CitadelCore.Net.Handlers
                     }
 
                     // This bit of reflection here is ugly-ugly-ugly. It fixes a bug where clients use and
-                    // depend on the Content-Type header to determine the return message from the server.
+                    // depend on the Content-Type header in a GET request to determine the return message
+                    // from the server.
                     // Some alternate fixes.
                     // 1. Use .NET core (see farther down).
                     // 2. Re-implement in its entirety the HttpRequestMessage class, which is a bit overkill
@@ -302,7 +303,8 @@ namespace CitadelCore.Net.Handlers
                             invalidFields.Remove("Content-Type");
                             LoggerProxy.Default.Info("Removing Content-Type from list of invalid headers.");
                         }
-                    } else
+                    }
+                    else
                     {
                         LoggerProxy.Default.Info("invalidHeaders fields not found.");
                     }
@@ -310,7 +312,8 @@ namespace CitadelCore.Net.Handlers
                     try
                     {
                         requestMsg.Headers.Add("Content-Type", contentTypeValue);
-                    } catch(Exception ex)
+                    }
+                    catch (Exception ex)
                     {
                         LoggerProxy.Default.Error(ex);
                     }
@@ -323,7 +326,7 @@ namespace CitadelCore.Net.Handlers
                 // modify these fields.
                 foreach (var et in failedInitialHeaders)
                 {
-                    if(!requestMsg.Headers.TryAddWithoutValidation(et.Item1, et.Item2))
+                    if(et.Item1.Equals("Content-Type", StringComparison.OrdinalIgnoreCase) || !requestMsg.Headers.TryAddWithoutValidation(et.Item1, et.Item2))
                     {
                         if(requestMsg.Content != null)
                         {
@@ -370,6 +373,10 @@ namespace CitadelCore.Net.Handlers
                             }
                         }
                     }
+                }
+                catch(TaskCanceledException e)
+                {
+                    // Just swallow these exceptions. There doesn't seem to be any ill effects coming from these anyway.
                 }
                 catch(Exception e)
                 {
