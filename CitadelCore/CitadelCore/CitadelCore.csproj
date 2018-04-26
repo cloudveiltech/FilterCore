@@ -48,6 +48,7 @@
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <DocumentationFile>bin\Release\netstandard2.0\CitadelCore.xml</DocumentationFile>
     <LangVersion>7.1</LangVersion>
+    <Optimize>true</Optimize>
   </PropertyGroup>
 
   <ItemGroup>
