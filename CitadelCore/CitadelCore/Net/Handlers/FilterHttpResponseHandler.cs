@@ -14,7 +14,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Net.Http;
+//using System.Net.Http;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -34,7 +34,7 @@ namespace CitadelCore.Net.Handlers
 
         private static readonly string s_EpochHttpDateTime = s_Epoch.ToString("r");
 
-        private static HttpClient s_client;
+        private static FilterHttpClient s_client;
 
         private static readonly Regex s_httpVerRegex = new Regex("([0-9]+\\.[0-9]+)", RegexOptions.Compiled | RegexOptions.ECMAScript);
 
@@ -64,7 +64,7 @@ namespace CitadelCore.Net.Handlers
             // We need UseCookies set to false here. We then need to set per-request cookies by
             // manually adding the "Cookie" header. If we don't have UseCookies set to false here,
             // this will not work.
-            HttpClientHandler handler = new HttpClientHandler()
+            var handler = new System.Net.Http.HttpClientHandler()
             {
                 AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
                 UseCookies = false,
@@ -74,7 +74,7 @@ namespace CitadelCore.Net.Handlers
                 Proxy = null
             };
             
-            s_client = new HttpClient(handler);
+            s_client = new FilterHttpClient(handler);
         }
         
         public FilterHttpResponseHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback) : base(messageBeginCallback, messageEndCallback)
@@ -110,7 +110,7 @@ namespace CitadelCore.Net.Handlers
                 }
 
                 // Create a new request to send out upstream.
-                var requestMsg = new HttpRequestMessage(new HttpMethod(context.Request.Method), fullUrl);
+                var requestMsg = new HttpRequestMessage(new System.Net.Http.HttpMethod(context.Request.Method), fullUrl);
 
                 if(context.Connection.ClientCertificate != null)
                 {
@@ -289,9 +289,9 @@ namespace CitadelCore.Net.Handlers
                     // 2. Re-implement in its entirety the HttpRequestMessage class, which is a bit overkill
                     
                     // Note to the reader: NEVER EVER DO THIS IF THERE ARE OTHER OPTIONS.
-                    var field = typeof(System.Net.Http.Headers.HttpRequestHeaders)
+                    var field = typeof(CitadelCore.Net.Http.Headers.HttpRequestHeaders)
                     .GetField("invalidHeaders", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
-                  ?? typeof(System.Net.Http.Headers.HttpRequestHeaders)
+                  ?? typeof(CitadelCore.Net.Http.Headers.HttpRequestHeaders)
                     .GetField("s_invalidHeaders", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
 
                     if (field != null)

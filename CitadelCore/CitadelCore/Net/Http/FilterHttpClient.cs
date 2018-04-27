@@ -6,7 +6,8 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
-using System.Net.Http.Headers;
+using CitadelCore.Net;
+using CitadelCore.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,8 +18,12 @@ namespace CitadelCore.Net.Http
     /// The reason is that .NET's approach to HTTP rule enforcement is too heavy-handed
     /// for a filter.
     /// </summary>
-    public class FilterHttpClient : System.Net.Http.HttpMessageInvoker
+    public class FilterHttpClient : HttpMessageInvoker
     {
+        #region Constants
+        private const int HttpContentMaxBufferSize = int.MaxValue;
+        #endregion
+
         #region Fields
 
         private static readonly TimeSpan s_defaultTimeout = TimeSpan.FromSeconds(100);
@@ -89,15 +94,15 @@ namespace CitadelCore.Net.Http
                 {
                     throw new ArgumentOutOfRangeException(nameof(value));
                 }
-                if (value > HttpContent.MaxBufferSize)
+                if (value > HttpContentMaxBufferSize)
                 {
                     throw new ArgumentOutOfRangeException(nameof(value), value,
                         string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                        SR.net_http_content_buffersize_limit, HttpContent.MaxBufferSize));
+                        SR.net_http_content_buffersize_limit, HttpContentMaxBufferSize));
                 }
                 CheckDisposedOrStarted();
 
-                Debug.Assert(HttpContent.MaxBufferSize <= int.MaxValue);
+                Debug.Assert(HttpContentMaxBufferSize <= int.MaxValue);
                 _maxResponseContentBufferSize = (int)value;
             }
         }
@@ -106,23 +111,23 @@ namespace CitadelCore.Net.Http
 
         #region Constructors
 
-        public HttpClient()
+        public FilterHttpClient()
             : this(new HttpClientHandler())
         {
         }
 
-        public HttpClient(HttpMessageHandler handler)
+        public FilterHttpClient(HttpMessageHandler handler)
             : this(handler, true)
         {
         }
 
-        public HttpClient(HttpMessageHandler handler, bool disposeHandler)
+        public FilterHttpClient(HttpMessageHandler handler, bool disposeHandler)
             : base(handler, disposeHandler)
         {
             if (NetEventSource.IsEnabled) NetEventSource.Enter(this, handler);
 
             _timeout = s_defaultTimeout;
-            _maxResponseContentBufferSize = HttpContent.MaxBufferSize;
+            _maxResponseContentBufferSize = HttpContentMaxBufferSize;
             _pendingRequestsCts = new CancellationTokenSource();
 
             if (NetEventSource.IsEnabled) NetEventSource.Exit(this);
@@ -411,7 +416,7 @@ namespace CitadelCore.Net.Http
             return SendAsync(request, defaultCompletionOption, CancellationToken.None);
         }
 
-        public override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+        public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             return SendAsync(request, defaultCompletionOption, cancellationToken);
@@ -596,7 +601,7 @@ namespace CitadelCore.Net.Http
 
         #region IDisposable Members
 
-        protected override void Dispose(bool disposing)
+        protected void Dispose(bool disposing)
         {
             if (disposing && !_disposed)
             {

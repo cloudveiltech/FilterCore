@@ -3,12 +3,12 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Diagnostics.CodeAnalysis;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Collections.Generic;
-using System.Net.Http;
 using System;
+
+using CitadelCore.Net.Http.Headers;
 
 namespace CitadelCore.Net.Http
 {
@@ -21,11 +21,11 @@ namespace CitadelCore.Net.Http
         // The message shouldn't be sent again if this field is equal to MessageAlreadySent.
         private int _sendStatus = MessageNotYetSent;
 
-        private HttpMethod _method;
+        private System.Net.Http.HttpMethod _method;
         private Uri _requestUri;
         private HttpRequestHeaders _headers;
         private Version _version;
-        private HttpContent _content;
+        private System.Net.Http.HttpContent _content;
         private bool _disposed;
         private IDictionary<String, Object> _properties;
 
@@ -44,7 +44,7 @@ namespace CitadelCore.Net.Http
             }
         }
 
-        public HttpContent Content
+        public System.Net.Http.HttpContent Content
         {
             get { return _content; }
             set
