@@ -20,6 +20,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using HttpRequestException = System.Net.Http.HttpRequestException;
 
 namespace CitadelCore.Net.Handlers
 {
@@ -110,7 +111,7 @@ namespace CitadelCore.Net.Handlers
                 }
 
                 // Create a new request to send out upstream.
-                var requestMsg = new HttpRequestMessage(new System.Net.Http.HttpMethod(context.Request.Method), fullUrl);
+                var requestMsg = new HttpRequestMessage(new HttpMethod(context.Request.Method), fullUrl);
 
                 if(context.Connection.ClientCertificate != null)
                 {

@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System;
 
 using CitadelCore.Net.Http.Headers;
+using SR = CitadelCore.Resources.Strings;
 
 namespace CitadelCore.Net.Http
 {
@@ -21,11 +22,11 @@ namespace CitadelCore.Net.Http
         // The message shouldn't be sent again if this field is equal to MessageAlreadySent.
         private int _sendStatus = MessageNotYetSent;
 
-        private System.Net.Http.HttpMethod _method;
+        private HttpMethod _method;
         private Uri _requestUri;
         private HttpRequestHeaders _headers;
         private Version _version;
-        private System.Net.Http.HttpContent _content;
+        private HttpContent _content;
         private bool _disposed;
         private IDictionary<String, Object> _properties;
 
@@ -44,7 +45,7 @@ namespace CitadelCore.Net.Http
             }
         }
 
-        public System.Net.Http.HttpContent Content
+        public HttpContent Content
         {
             get { return _content; }
             set

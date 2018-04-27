@@ -5,11 +5,15 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net.Http;
 using CitadelCore.Net;
+using CitadelCore.Net.IO;
 using CitadelCore.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using HttpMessageHandler = System.Net.Http.HttpMessageHandler;
+using HttpClientHandler = System.Net.Http.HttpClientHandler;
+using HttpRequestException = System.Net.Http.HttpRequestException;
+using SR = CitadelCore.Resources.Strings;
 
 namespace CitadelCore.Net.Http
 {

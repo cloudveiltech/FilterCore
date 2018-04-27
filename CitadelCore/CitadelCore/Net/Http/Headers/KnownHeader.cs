@@ -34,7 +34,11 @@ namespace CitadelCore.Net.Http.Headers
             _knownValues = knownValues;
 
             _asciiBytesWithColonSpace = new byte[name.Length + 2]; // + 2 for ':' and ' '
-            int asciiBytes = Encoding.ASCII.GetBytes(name, _asciiBytesWithColonSpace);
+
+            //int asciiBytes = Encoding.ASCII.GetBytes(name, _asciiBytesWithColonSpace);
+
+            int asciiBytes = Encoding.ASCII.GetBytes(name, 0, name.Length, _asciiBytesWithColonSpace, 0);
+
             Debug.Assert(asciiBytes == name.Length);
             _asciiBytesWithColonSpace[_asciiBytesWithColonSpace.Length - 2] = (byte)':';
             _asciiBytesWithColonSpace[_asciiBytesWithColonSpace.Length - 1] = (byte)' ';

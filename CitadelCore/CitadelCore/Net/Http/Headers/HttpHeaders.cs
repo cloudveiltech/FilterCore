@@ -1227,7 +1227,7 @@ namespace CitadelCore.Net.Http.Headers
         {
             if (HttpRuleParser.ContainsInvalidNewLine(value))
             {
-                if (NetEventSource.IsEnabled) NetEventSource.Error(null, SR.Format(SR.net_http_log_headers_no_newlines, name, value));
+                if (NetEventSource.IsEnabled) NetEventSource.Error(null, System.SR.Format(SR.net_http_log_headers_no_newlines, name, value));
                 return true;
             }
             return false;

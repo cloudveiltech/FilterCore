@@ -8,6 +8,7 @@ using System.Net.Http;
 using CitadelCore.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Reflection;
 
 namespace CitadelCore.Net.Http
 {
@@ -39,6 +40,8 @@ namespace CitadelCore.Net.Http
             if (NetEventSource.IsEnabled) NetEventSource.Exit(this);
         }
 
+        private MethodInfo sendAsyncMethod;
+
         public virtual Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
@@ -50,7 +53,14 @@ namespace CitadelCore.Net.Http
 
             if (NetEventSource.IsEnabled) NetEventSource.Enter(this, request);
 
-            Task<HttpResponseMessage> task = _handler.SendAsync(request, cancellationToken);
+            // Another hack that you shouldn't do. However, I don't want to port the whole HttpMessageHandler hierarchy to CitadelCore.
+            if (sendAsyncMethod == null)
+            {
+                sendAsyncMethod = typeof(HttpMessageHandler).GetMethod("SendAsync", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            }
+
+            Task<HttpResponseMessage> task = sendAsyncMethod.Invoke(_handler, new object[] { request, cancellationToken }) as Task<HttpResponseMessage>;
+            //Task<HttpResponseMessage> task = _handler.SendAsync(request, cancellationToken);
 
             if (NetEventSource.IsEnabled) NetEventSource.Exit(this, task);
 

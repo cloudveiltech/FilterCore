@@ -7,9 +7,11 @@ using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Globalization;
 using System.IO;
+using CitadelCore.Net.IO;
 using System.Net.Mail;
 using System.Text;
 using System;
+using SR = CitadelCore.Resources.Strings;
 
 namespace CitadelCore.Net.Http.Headers
 {
@@ -141,7 +143,7 @@ namespace CitadelCore.Net.Http.Headers
                     return qualityValue;
                 }
                 // If the stored value is an invalid quality value, just return null and log a warning. 
-                if (NetEventSource.IsEnabled) NetEventSource.Error(null, SR.Format(SR.net_http_log_headers_invalid_quality, qualityParameter.Value));
+                if (NetEventSource.IsEnabled) NetEventSource.Error(null, System.SR.Format(SR.net_http_log_headers_invalid_quality, qualityParameter.Value));
             }
             return null;
         }
@@ -409,16 +411,15 @@ namespace CitadelCore.Net.Http.Headers
         {
             try
             {
-#if uap
-                new MailAddress(value);
-#else
-                MailAddressParser.ParseAddress(value);
-#endif
-                return true;
+                var address = new MailAddress(value);
+                if(address.Address == value)
+                {
+                    return true;
+                }
             }
             catch (FormatException e)
             {
-                if (NetEventSource.IsEnabled) NetEventSource.Error(null, SR.Format(SR.net_http_log_headers_wrong_email_format, value, e.Message));
+                if (NetEventSource.IsEnabled) NetEventSource.Error(null, System.SR.Format(SR.net_http_log_headers_wrong_email_format, value, e.Message));
             }
             return false;
         }

@@ -4,6 +4,7 @@
 
 using System;
 using System.Diagnostics;
+using SR = CitadelCore.Resources.Strings;
 
 namespace CitadelCore.Net.Http.Headers
 {
@@ -50,7 +51,7 @@ namespace CitadelCore.Net.Http.Headers
             }
             catch (FormatException e)
             {
-                if (NetEventSource.IsEnabled) NetEventSource.Error(this, SR.Format(SR.net_http_parser_invalid_base64_string, base64String, e.Message));
+                if (NetEventSource.IsEnabled) NetEventSource.Error(this, System.SR.Format(SR.net_http_parser_invalid_base64_string, base64String, e.Message));
             }
 
             return false;

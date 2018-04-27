@@ -4,6 +4,7 @@
 
 using System;
 using System.Diagnostics;
+using SR = CitadelCore.Resources.Strings;
 
 namespace CitadelCore.Net.Http
 {

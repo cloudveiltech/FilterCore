@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using CitadelCore.Net.IO;
 using System.Text;
 
 namespace CitadelCore.Net.Http.Headers

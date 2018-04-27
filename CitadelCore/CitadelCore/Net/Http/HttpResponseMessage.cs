@@ -6,6 +6,8 @@ using System;
 using System.Net;
 using CitadelCore.Net.Http.Headers;
 using System.Text;
+using HttpRequestException = System.Net.Http.HttpRequestException;
+using SR = CitadelCore.Resources.Strings;
 
 namespace CitadelCore.Net.Http
 {
