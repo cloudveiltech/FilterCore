@@ -7,10 +7,14 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.IO;
-using System.Net.Http.Headers;
+using CitadelCore.Net.IO;
+using CitadelCore.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using SR = CitadelCore.Resources.Strings;
+using HttpRequestException = System.Net.Http.HttpRequestException;
+using System.Net;
 
 namespace CitadelCore.Net.Http
 {
@@ -144,12 +148,7 @@ namespace CitadelCore.Net.Http
 
         internal bool TryGetBuffer(out ArraySegment<byte> buffer)
         {
-            if (_bufferedContent != null)
-            {
-                return _bufferedContent.TryGetBuffer(out buffer);
-            }
-            buffer = default;
-            return false;
+            return _bufferedContent != null && _bufferedContent.TryGetBuffer(out buffer);
         }
 
         protected HttpContent()
@@ -326,17 +325,19 @@ namespace CitadelCore.Net.Http
 
             try
             {
+                Task task = null;
                 ArraySegment<byte> buffer;
                 if (TryGetBuffer(out buffer))
                 {
-                    return CopyToAsyncCore(stream.WriteAsync(new ReadOnlyMemory<byte>(buffer.Array, buffer.Offset, buffer.Count), cancellationToken));
+                    task = stream.WriteAsync(buffer.Array, buffer.Offset, buffer.Count, cancellationToken);
                 }
                 else
                 {
-                    Task task = SerializeToStreamAsync(stream, context, cancellationToken);
+                    task = SerializeToStreamAsync(stream, context, cancellationToken);
                     CheckTaskNotNull(task);
-                    return CopyToAsyncCore(new ValueTask(task));
                 }
+
+                return CopyToAsyncCore(task);
             }
             catch (Exception e) when (StreamCopyExceptionNeedsWrapping(e))
             {
@@ -344,7 +345,7 @@ namespace CitadelCore.Net.Http
             }
         }
 
-        private static async Task CopyToAsyncCore(ValueTask copyTask)
+        private static async Task CopyToAsyncCore(Task copyTask)
         {
             try
             {
@@ -697,7 +698,7 @@ namespace CitadelCore.Net.Http
 
         private static Exception CreateOverCapacityException(int maxBufferSize)
         {
-            return new HttpRequestException(SR.Format(SR.net_http_content_buffersize_exceeded, maxBufferSize));
+            return new HttpRequestException(System.SR.Format(SR.net_http_content_buffersize_exceeded, maxBufferSize));
         }
 
         internal sealed class LimitMemoryStream : MemoryStream
@@ -735,12 +736,6 @@ namespace CitadelCore.Net.Http
             {
                 CheckSize(count);
                 return base.WriteAsync(buffer, offset, count, cancellationToken);
-            }
-
-            public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
-            {
-                CheckSize(buffer.Length);
-                return base.WriteAsync(buffer, cancellationToken);
             }
 
             public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
@@ -875,12 +870,12 @@ namespace CitadelCore.Net.Http
                 _length += count;
             }
 
-            public override void Write(ReadOnlySpan<byte> buffer)
+            /*public override void Write(ReadOnlySpan<byte> source)
             {
-                EnsureCapacity(_length + buffer.Length);
-                buffer.CopyTo(new Span<byte>(_buffer, _length, buffer.Length));
-                _length += buffer.Length;
-            }
+                EnsureCapacity(_length + source.Length);
+                source.CopyTo(new Span<byte>(_buffer, _length, source.Length));
+                _length += source.Length;
+            }*/
 
             public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
             {
@@ -888,11 +883,11 @@ namespace CitadelCore.Net.Http
                 return Task.CompletedTask;
             }
 
-            public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+            /*public override Task WriteAsync(ReadOnlyMemory<byte> source, CancellationToken cancellationToken = default)
             {
-                Write(buffer.Span);
-                return default;
-            }
+                Write(source.Span);
+                return Task.CompletedTask;
+            }*/
 
             public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback asyncCallback, object asyncState) =>
                 TaskToApm.Begin(WriteAsync(buffer, offset, count, CancellationToken.None), asyncCallback, asyncState);

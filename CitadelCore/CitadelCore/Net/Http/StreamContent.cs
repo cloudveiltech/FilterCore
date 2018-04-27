@@ -2,10 +2,13 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using SR = CitadelCore.Resources.Strings;
 
 namespace CitadelCore.Net.Http
 {
@@ -152,25 +155,25 @@ namespace CitadelCore.Net.Http
                 throw new NotSupportedException(SR.net_http_content_readonly_stream);
             }
 
-            public override void Write(ReadOnlySpan<byte> buffer)
+            /*public override void Write(ReadOnlySpan<byte> buffer)
             {
                 throw new NotSupportedException(SR.net_http_content_readonly_stream);
-            }
+            }*/
 
             public override void WriteByte(byte value)
             {
                 throw new NotSupportedException(SR.net_http_content_readonly_stream);
             }
 
-            public override Task WriteAsync(byte[] buffer, int offset, int count, Threading.CancellationToken cancellationToken)
+            public override Task WriteAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken)
             {
                 throw new NotSupportedException(SR.net_http_content_readonly_stream);
             }
 
-            public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+            /*public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException(SR.net_http_content_readonly_stream);
-            }
+            }*/
         }
     }
 }

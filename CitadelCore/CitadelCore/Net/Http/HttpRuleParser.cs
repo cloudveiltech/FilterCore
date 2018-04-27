@@ -148,7 +148,7 @@ namespace CitadelCore.Net.Http
         {
             Debug.Assert(IsToken(input));
 
-            return Encoding.ASCII.GetString(input);
+            return Encoding.ASCII.GetString(input.ToArray());
         }
 
         internal static int GetWhitespaceLength(string input, int startIndex)
