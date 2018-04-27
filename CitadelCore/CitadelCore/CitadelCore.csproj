@@ -12,11 +12,11 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/cloudveiltech/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Adds kludge fix for revocation server issues on Filter-Windows.</PackageReleaseNotes>
+    <PackageReleaseNotes>Fixes reveal.fleetmatics.com issue.</PackageReleaseNotes>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy. Forked from https://github.com/TechnikEmpire/CitadelCore</Description>
-    <Version>1.3.20</Version>
-    <AssemblyVersion>1.3.20.0</AssemblyVersion>
-    <FileVersion>1.3.20.0</FileVersion>
+    <Version>1.3.21</Version>
+    <AssemblyVersion>1.3.21.0</AssemblyVersion>
+    <FileVersion>1.3.21.0</FileVersion>
     <Product>CitadelCore</Product>
     <PackageId>CloudVeil.CitadelCore</PackageId>    
   </PropertyGroup>
