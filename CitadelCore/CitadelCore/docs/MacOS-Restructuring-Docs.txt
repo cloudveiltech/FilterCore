@@ -1,0 +1,31 @@
+﻿Split FilterCore into two internal parts.
+1. Diversion (IDiverter) applications - FilterCore/Kestrel will have its own
+internal implementations of IMessageFactory, IRequestMessage, and IResponseMessage.
+This will allow the client application to use packet-level filtering in addition
+to HTTP filtering. This is a step below IMessageFactory applications.
+
+2. HttpFiltering (IMessageFactory) applications - These are capable of HTTP/HTTPS
+filtering but not packet level, as they do not have that type of control. These
+applications are close to Kestrel in control. ICAP server applications would
+implement this stack.
+
+Diversion part stays the same way it is already.
+
+FilterCore.Windows is a Diversion application.
+FilterCore.Unix is an HttpFiltering application.
+
+HttpFiltering documentation
+
+IRequestMessage:
+
+A note on how FilterWebsocketHandler and FilterHttpResponseHandler work together.
+AbstractFilteringResponseHandler is responsible for dispatching websockets and HTTP calls
+to their proper handlers.
+
+Restructuring plan goes like this:
+    1. FilterHttpResponseHandler.cs gets rewritten to use HttpFiltering interfaces.
+    2. How does FilterWebsocketHandler.cs fit in here? This is very important.
+    3.  Write Kestrel wrappers for FilterHttpResponseHandler.cs to interface Microsoft
+        HttpRequestMessage/HttpResponseMessage types with the new HttpFiltering interface.
+
+**doc not complete**

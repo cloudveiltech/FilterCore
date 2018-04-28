@@ -66,4 +66,8 @@
   </ItemGroup>
 
 
+  <ItemGroup>
+    <Folder Include="HttpFiltering\" />
+    <Folder Include="docs\" />
+  </ItemGroup>
 </Project>
