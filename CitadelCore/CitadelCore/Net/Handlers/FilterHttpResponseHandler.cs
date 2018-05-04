@@ -65,7 +65,7 @@ namespace CitadelCore.Net.Handlers
             // We need UseCookies set to false here. We then need to set per-request cookies by
             // manually adding the "Cookie" header. If we don't have UseCookies set to false here,
             // this will not work.
-            var handler = new System.Net.Http.HttpClientHandler()
+            var handler = new HttpClientHandler()
             {
                 AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
                 UseCookies = false,

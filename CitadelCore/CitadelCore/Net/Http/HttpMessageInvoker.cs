@@ -54,13 +54,7 @@ namespace CitadelCore.Net.Http
             if (NetEventSource.IsEnabled) NetEventSource.Enter(this, request);
 
             // Another hack that you shouldn't do. However, I don't want to port the whole HttpMessageHandler hierarchy to CitadelCore.
-            if (sendAsyncMethod == null)
-            {
-                sendAsyncMethod = typeof(HttpMessageHandler).GetMethod("SendAsync", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            }
-
-            Task<HttpResponseMessage> task = sendAsyncMethod.Invoke(_handler, new object[] { request, cancellationToken }) as Task<HttpResponseMessage>;
-            //Task<HttpResponseMessage> task = _handler.SendAsync(request, cancellationToken);
+            Task<HttpResponseMessage> task = _handler.SendAsync(request, cancellationToken);
 
             if (NetEventSource.IsEnabled) NetEventSource.Exit(this, task);
 
