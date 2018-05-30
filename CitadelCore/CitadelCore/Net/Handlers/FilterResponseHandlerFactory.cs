@@ -5,6 +5,7 @@
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+using CitadelCore.Net.Http;
 using CitadelCore.Net.Proxy;
 using Microsoft.AspNetCore.Http;
 
@@ -34,10 +35,11 @@ namespace CitadelCore.Net.Handlers
             set;
         }
 
-        public BadCertificateCallback BadCertificateCallback
+        public BadCertificateCallback BadCertificateCallback { get; set; }
+
+        public ICertificateExemptions CertificateExemptions
         {
-            get;
-            set;
+            get; set;
         }
 
         public AbstractFilterResponseHandler GetHandler(HttpContext context)

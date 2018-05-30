@@ -58,8 +58,8 @@ namespace CitadelCore.Net.Handlers
             // the cert if the revocation server is offline.
             // Rather than disabling the check as seen here.
             ServicePointManager.CheckCertificateRevocationList = false;
-            
-            //ServicePointManager.ServerCertificateValidationCallback = ValidateCertificate;
+
+            ServicePointManager.ServerCertificateValidationCallback = ValidateCertificate;
 
             // We need UseCookies set to false here. We then need to set per-request cookies by
             // manually adding the "Cookie" header. If we don't have UseCookies set to false here,
@@ -72,9 +72,11 @@ namespace CitadelCore.Net.Handlers
                 //UseDefaultCredentials = false,
                 AllowAutoRedirect = false,
                 Proxy = null
+                
             };
             
             s_client = new HttpClient(handler);
+            
         }
         
         public FilterHttpResponseHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback) : base(messageBeginCallback, messageEndCallback)
@@ -85,10 +87,45 @@ namespace CitadelCore.Net.Handlers
         {
         }
 
+        /// <summary>
+        /// I'll try to explain a little bit what's going on here.
+        /// 
+        /// We need a way to exempt SSL certificates that are invalid. 
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="certificate"></param>
+        /// <param name="chain"></param>
+        /// <param name="sslPolicyErrors"></param>
+        /// <returns></returns>
         public static bool ValidateCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
-            LoggerProxy.Default.Info($"Certificate {certificate.GetEffectiveDateString()} {certificate.GetExpirationDateString()} {certificate.Issuer}");
-            return true;
+            HttpWebRequest request = (HttpWebRequest)sender;
+
+            if(sslPolicyErrors == SslPolicyErrors.None)
+            {
+                return true;
+            }
+
+            try
+            {
+                if (FilterResponseHandlerFactory.Default.CertificateExemptions?.IsExempted(request, certificate) == true)
+                {
+                    return true;
+                }
+                else
+                {
+                    // We need to get the information from here to the Handle() function.
+                    // This might need to be a mechanism completely separate from the Handle() function.
+                    FilterResponseHandlerFactory.Default.CertificateExemptions?.AddExemptionRequest(request, certificate);
+                }
+
+            }
+            catch(Exception ex)
+            {
+                LoggerProxy.Default.Error(ex);
+            }
+
+            return false;
         }
 
         public override async Task Handle(HttpContext context)

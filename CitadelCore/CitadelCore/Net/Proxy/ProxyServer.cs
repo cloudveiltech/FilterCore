@@ -118,27 +118,26 @@ namespace CitadelCore.Net.Proxy
         private object m_startStopLock = new object();
 
         /// <summary>
-        /// Creates a new proxy server instance. Really there should only ever be a single instance
-        /// created at a time.
+        /// Initialize the proxy server. See <see cref="ProxyOptions"/> for more information on parameters.
         /// </summary>
-        /// <param name="firewallCallback">
-        /// The firewall check callback. Used to allow the user to determine if a binary should have
-        /// its associated traffic pushed through the filter or not.
-        /// </param>
-        /// <param name="messageBeginCallback">
-        /// Message begin callback enables users to inspect and filter messages immediately after
-        /// they begin. Users also have the power to direct how the proxy will continue to handle the
-        /// overall transaction that this message belongs to.
-        /// </param>
-        /// <param name="messageEndCallback">
-        /// Message end callback enables users to inspect and filter messages once they have completed. 
-        /// </param>
-        /// <param name="badCertificateCallback">
-        /// Bad certificate callback 
-        /// </param>
-        /// <exception cref="ArgumentException">
-        /// Will throw if any one of the callbacks are not defined. 
-        /// </exception>
+        /// <param name="options">See <see cref="ProxyOptions"/></param>
+        public ProxyServer(ProxyOptions options)
+        {
+            m_fwCallback = options.FirewallCheckCallback ?? throw new ArgumentException("The firewall callback MUST be defined.");
+
+            FilterResponseHandlerFactory.Default.MessageBeginCallback = options.MessageBeginCallback
+                ?? throw new ArgumentException("The message begin callback MUST be defined.");
+
+            FilterResponseHandlerFactory.Default.MessageEndCallback = options.MessageEndCallback
+                ?? throw new ArgumentException("The message end callback MUST be defined.");
+
+            FilterResponseHandlerFactory.Default.BadCertificateCallback = options.BadCertificateCallback;
+            FilterResponseHandlerFactory.Default.CertificateExemptions = options.CertificateExemptions
+                ?? throw new ArgumentException("The certificate exemptions MUST be defined.");
+
+        }
+
+        [Obsolete("Use ProxyServer(ProxyOptions) instead to aid readability")]
         public ProxyServer(FirewallCheckCallback firewallCallback, MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback, BadCertificateCallback badCertificateCallback = null)
         {
             if(firewallCallback == null)
