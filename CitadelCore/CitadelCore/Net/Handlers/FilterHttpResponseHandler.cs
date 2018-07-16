@@ -5,6 +5,7 @@
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+using CitadelCore.Diagnostics;
 using CitadelCore.Logging;
 using CitadelCore.Net.Http;
 using CitadelCore.Net.Proxy;
@@ -51,13 +52,6 @@ namespace CitadelCore.Net.Handlers
             ServicePointManager.CheckCertificateRevocationList = true;
             ServicePointManager.ReusePort = true;
             ServicePointManager.UseNagleAlgorithm = false;
-
-            // This is a kludge for the billing.vispnet.ca issue.
-            // Ideally, we need a little lower-level handle on this issue.
-            // I'd like to be able to check the revocation list, and accept
-            // the cert if the revocation server is offline.
-            // Rather than disabling the check as seen here.
-            ServicePointManager.CheckCertificateRevocationList = false;
 
             ServicePointManager.ServerCertificateValidationCallback = ValidateCertificate;
 
@@ -108,6 +102,31 @@ namespace CitadelCore.Net.Handlers
 
             try
             {
+                // CRL ignores thanks to https://github.com/TechnikEmpire/CitadelCore.
+
+                // We will tolerate certain chain status issues, such as a failure
+                // to reach the CRL server.
+                int acceptable = 0;
+                foreach(var element in chain.ChainStatus)
+                {
+                    switch(element.Status)
+                    {
+                        case X509ChainStatusFlags.OfflineRevocation:
+                        case X509ChainStatusFlags.RevocationStatusUnknown:
+                            {
+                                ++acceptable;
+                            }
+                            break;
+                    }
+                }
+
+                if(acceptable > 0 && acceptable == chain.ChainStatus.Length)
+                {
+                    chain.ChainPolicy.VerificationFlags = X509VerificationFlags.IgnoreCertificateAuthorityRevocationUnknown;
+                    var asX2 = new X509Certificate2(certificate);
+                    return chain.Build(asX2);
+                }
+
                 if (FilterResponseHandlerFactory.Default.CertificateExemptions?.IsExempted(request, certificate) == true)
                 {
                     return true;
@@ -117,6 +136,11 @@ namespace CitadelCore.Net.Handlers
                     // We need to get the information from here to the Handle() function.
                     // This might need to be a mechanism completely separate from the Handle() function.
                     FilterResponseHandlerFactory.Default.CertificateExemptions?.AddExemptionRequest(request, certificate);
+
+                    BadSslReport badSsl = new BadSslReport();
+                    badSsl.Host = request.Host;
+                    badSsl.RequestUri = request.RequestUri;
+                    Collector.ReportBadSsl(badSsl);
                 }
 
             }
@@ -130,6 +154,10 @@ namespace CitadelCore.Net.Handlers
 
         public override async Task Handle(HttpContext context)
         {
+            // Use this to collect information about the HTTP request's server and client parts.
+            Diagnostics.DiagnosticsWebSession diagSession = new Diagnostics.DiagnosticsWebSession();
+            diagSession.DateStarted = DateTime.Now;
+
             try
             {
                 // Use helper to get the full, proper URL for the request.
@@ -148,6 +176,7 @@ namespace CitadelCore.Net.Handlers
 
                 // Create a new request to send out upstream.
                 var requestMsg = new HttpRequestMessage(new HttpMethod(context.Request.Method), fullUrl);
+                diagSession.ClientRequestUri = fullUrl;
 
                 if(context.Connection.ClientCertificate != null)
                 {
@@ -226,6 +255,10 @@ namespace CitadelCore.Net.Handlers
                 // Add trailing CRLF to the request headers string.
                 reqHeaderBuilder.Append("\r\n");
 
+                diagSession.ClientRequestHeaders = reqHeaderBuilder.ToString();
+
+                bool upstreamIsHttp1 = upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0;
+
                 // Since headers are complete at this stage, let's do our first call to message begin
                 // for the request side.
                 ProxyNextAction requestNextAction = ProxyNextAction.AllowAndIgnoreContentAndResponse;
@@ -259,6 +292,8 @@ namespace CitadelCore.Net.Handlers
                     // If we don't have a body, there's no sense in calling the message end callback.
                     if(requestBody.Length > 0)
                     {
+                        diagSession.ClientRequestBody = requestBody;
+
                         // We have a body and the user previously instructed us to give them the
                         // content, if any, for inspection.
                         if(requestNextAction == ProxyNextAction.AllowButRequestContentInspection)
@@ -308,7 +343,7 @@ namespace CitadelCore.Net.Handlers
                     }
                 }
 
-                if(contentTypeValue != null && requestMsg.Content == null)
+                if (contentTypeValue != null && requestMsg.Content == null)
                 {
                     // FIXME: Parse out charset properly.
                     string[] contentTypeParts = contentTypeValue.Split(';');
@@ -375,6 +410,11 @@ namespace CitadelCore.Net.Handlers
                     }
                 }
 
+                if(Diagnostics.Collector.IsDiagnosticsEnabled)
+                {
+                    diagSession.ServerRequestHeaders = requestMsg.Headers.ToString();
+                }
+
                 // Lets start sending the request upstream. We're going to as the client to return
                 // control to us when the headers are complete. This way we're not buffering entire
                 // responses into memory, and if the user doesn't request to inspect the content, we
@@ -385,10 +425,13 @@ namespace CitadelCore.Net.Handlers
                 try
                 {
                     response = await s_client.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+
+                    diagSession.StatusCode = (int)(response?.StatusCode ?? 0);
                 }
                 catch(HttpRequestException ex)
                 {
-                    LoggerProxy.Default.Error(ex);
+                    LoggerProxy.Default.Error(ex.GetType().Name);
+                    LoggerProxy.Default.Error(ex); // Getting an error here on portal.worldpay.us
 
                     if(ex.InnerException is WebException && ex.InnerException.InnerException is System.Security.Authentication.AuthenticationException)
                     {
@@ -408,6 +451,15 @@ namespace CitadelCore.Net.Handlers
                             {
                                 Do204(context);
                             }
+                        }
+                    }
+                    else if(ex.InnerException is WebException)
+                    {
+                        var webException = ex.InnerException as WebException;
+
+                        if(webException.Response != null)
+                        {
+                            diagSession.StatusCode = (int?)(webException.Response as HttpWebResponse)?.StatusCode ?? 0;
                         }
                     }
                 }
@@ -435,6 +487,7 @@ namespace CitadelCore.Net.Handlers
                 var resHeaderBuilder = new StringBuilder();
 
                 bool responseHasZeroContentLength = false;
+                bool responseIsFixedLength = false;
 
                 // Iterate over all upstream response headers. Note that response.Content.Headers is
                 // not ALL headers. Headers are split up into different properties according to
@@ -445,7 +498,12 @@ namespace CitadelCore.Net.Handlers
                     {
                         if(hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && hdr.Value.ToString().Equals("0"))
                         {
-                            responseHasZeroContentLength = true;
+                            responseIsFixedLength = true;
+
+                            if(hdr.Value.ToString().Equals("0"))
+                            {
+                                responseHasZeroContentLength = true;
+                            }
                         }
                     }
                     catch { }
@@ -463,6 +521,15 @@ namespace CitadelCore.Net.Handlers
 
                     try
                     {
+                        /*IEnumerable<string> valueEnumerable = response.Content.Headers.GetValues(hdr.Key);
+                        StringBuilder strBuilder = new StringBuilder();
+                        foreach(var value in valueEnumerable)
+                        {
+                            strBuilder.Append($"'{value}',");
+                        }
+
+                        LoggerProxy.Default.Info($"{hdr.Key} ::: {strBuilder.ToString()}");*/
+
                         context.Response.Headers.Add(hdr.Key, new Microsoft.Extensions.Primitives.StringValues(hdr.Value.ToArray()));
                     }
                     catch(Exception e)
@@ -477,9 +544,14 @@ namespace CitadelCore.Net.Handlers
                 {
                     try
                     {
-                        if(hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && hdr.Value.ToString().Equals("0"))
+                        if (hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && hdr.Value.ToString().Equals("0"))
                         {
-                            responseHasZeroContentLength = true;
+                            responseIsFixedLength = true;
+
+                            if (hdr.Value.ToString().Equals("0"))
+                            {
+                                responseHasZeroContentLength = true;
+                            }
                         }
                     }
                     catch { }
@@ -506,6 +578,9 @@ namespace CitadelCore.Net.Handlers
                 }
 
                 resHeaderBuilder.Append("\r\n");
+
+                diagSession.ServerResponseHeaders = resHeaderBuilder.ToString();
+                // FIXME: Sadly this proxy doesn't have access to raw server headers?
 
                 // Now that we have response headers, let's call the message begin handler for the
                 // response. Unless of course, the user has asked us NOT to do this.
@@ -540,6 +615,7 @@ namespace CitadelCore.Net.Handlers
                                 await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(upstreamResponseStream, ms, null, context.RequestAborted);
 
                                 var responseBody = ms.ToArray();
+                                diagSession.ServerResponseBody = responseBody;
 
                                 bool shouldBlockResponse = false;
                                 responseBlockResponseContentType = string.Empty;
@@ -569,11 +645,11 @@ namespace CitadelCore.Net.Handlers
                                 // not try to write a body, even if present, if the status is 204.
                                 // Kestrel will not let us do this, and so far I can't find a way to
                                 // remove this technically correct strict-compliance.
-                                if(responseBody.Length > 0 && context.Response.StatusCode != 204)
+                                if(!responseHasZeroContentLength && (responseBody.Length > 0 && context.Response.StatusCode != 204))
                                 {
                                     // If the request is HTTP1.0, we need to pull all the data so we
                                     // can properly set the content-length by adding the header in.
-                                    if(upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0)
+                                    if(upstreamIsHttp1)
                                     {
                                         context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
                                     }
@@ -601,13 +677,14 @@ namespace CitadelCore.Net.Handlers
 
                 using(var responseStream = await response.Content.ReadAsStreamAsync())
                 {
-                    if(upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0)
+                    if(!responseHasZeroContentLength && (upstreamIsHttp1 || responseIsFixedLength))
                     {
                         using(var ms = new MemoryStream())
                         {
                             await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(responseStream, ms, null, context.RequestAborted);
 
                             var responseBody = ms.ToArray();
+                            diagSession.ServerResponseBody = responseBody;
 
                             context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
 
@@ -634,6 +711,11 @@ namespace CitadelCore.Net.Handlers
                     // Ignore task cancelled exceptions.
                     LoggerProxy.Default.Error(e);
                 }
+            }
+            finally
+            {
+                diagSession.DateEnded = DateTime.Now;
+                Diagnostics.Collector.ReportSession(diagSession);
             }
         }
 

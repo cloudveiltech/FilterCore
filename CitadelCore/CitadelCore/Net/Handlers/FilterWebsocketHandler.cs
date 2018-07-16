@@ -15,6 +15,7 @@ using System.Text;
 using System.Threading;
 using CitadelCore.Net.Http;
 using CitadelCore.Extensions;
+using CitadelCore.Diagnostics;
 using Microsoft.AspNetCore.WebSockets.Protocol;
 
 namespace CitadelCore.Net.Handlers
@@ -34,6 +35,8 @@ namespace CitadelCore.Net.Handlers
 
         public override async Task Handle(HttpContext context)
         {
+            DiagnosticsWebSession diagSession = new DiagnosticsWebSession();
+
             try
             {
                 // First we need the URL for this connection, since it's been requested to be upgraded to
@@ -49,6 +52,8 @@ namespace CitadelCore.Net.Handlers
                 {
                     fullUrl = "wss://" + fullUrl.Substring(8);
                 }
+
+                diagSession.ClientRequestUri = fullUrl;
 
                 // Next we need to try and parse the URL as a URI, because the websocket client requires
                 // this for connecting upstream.
@@ -91,6 +96,17 @@ namespace CitadelCore.Net.Handlers
 
                 LoggerProxy.Default.Info(string.Format("Connecting websocket to {0}", wsUri.AbsoluteUri));
 
+                if(Collector.IsDiagnosticsEnabled)
+                {
+                    var diagHeaderBuilder = new StringBuilder();
+                    foreach(var hdr in context.Request.Headers)
+                    {
+                        diagHeaderBuilder.AppendFormat($"{hdr.Key}: {hdr.Value.ToString()}\r\n");
+                    }
+
+                    diagSession.ClientRequestHeaders = diagHeaderBuilder.ToString();
+                }
+
                 var reqHeaderBuilder = new StringBuilder();
                 foreach (var hdr in context.Request.Headers)
                 {
@@ -115,6 +131,8 @@ namespace CitadelCore.Net.Handlers
                 }
 
                 reqHeaderBuilder.Append("\r\n");
+
+                diagSession.ServerRequestHeaders = reqHeaderBuilder.ToString();
 
                 string serverSubProtocol = null;
 
@@ -209,6 +227,10 @@ namespace CitadelCore.Net.Handlers
             catch(Exception wshe)
             {
                 LoggerProxy.Default.Error(wshe);
+            }
+            finally
+            {
+                Collector.ReportSession(diagSession);
             }
         }
     }

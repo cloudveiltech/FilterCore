@@ -260,10 +260,10 @@ namespace CitadelCore.Net.Proxy
 
             ListenOptions httpListenOptions = null;
             ListenOptions httpsListenOptions = null;
-            
-            ipWebhostBuilder.UseLibuv(opts =>
+
+            ipWebhostBuilder.UseSockets(opts =>
             {
-                opts.ThreadCount = Environment.ProcessorCount;
+                opts.IOQueueCount = 0;
             });
 
             // Use Kestrel server.
@@ -298,7 +298,7 @@ namespace CitadelCore.Net.Proxy
                 });
 
             });
-            
+
             // Configures how we handle requests and errors, etc.            
             ipWebhostBuilder.UseStartup<Startup>();
             
